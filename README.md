@@ -41,3 +41,6 @@ git clone git@github.com:soypat/lneto.git
 go work init
 go work use . ./lneto
 ```
+
+## Contributing
+PRs welcome!
