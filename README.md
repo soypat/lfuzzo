@@ -42,5 +42,13 @@ go work init
 go work use . ./lneto
 ```
 
+## Fuzz corpus and seeding new machines
+Fuzz corpus is located at `$GOCACHE/fuzz`. Following command works in bash, zsh and PowerShell:
+```sh
+# Will list different lfuzzo fuzz folders
+ls "$(go env GOCACHE)/fuzz/github.com/soypat/lfuzzo"
+```
+This is where "interesting" results are persisted. They can be used to seed a machine before it begins fuzzing for the first time.
+
 ## Contributing
 PRs welcome!
