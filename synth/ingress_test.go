@@ -53,15 +53,21 @@ func newFuzzStackCfg(t testing.TB, mtu uint16, icmpq int) (*xnet.StackAsync, []u
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.EnableICMP(true)
+	err = s.EnableICMP(true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s.SetGatewayHardwareAddr(fzPeer)
 	s.SetSubnet4(fzIP4, 24)
 	var pc udp.PacketConn
 	if pc.Configure(udp.PacketConnConfig{RxBuf: make([]byte, 4096), TxBuf: make([]byte, 4096), RxQueueSize: 4, TxQueueSize: 4}) == nil &&
 		pc.Open(netip.AddrPortFrom(netip.Addr{}, 53)) == nil {
-		s.RegisterListenerUDP(&pc)
+		err = s.RegisterListenerUDP(&pc)
 	}
-	s.StartDHCPv4Request([4]byte{})
+	err = s.StartDHCPv4Request([4]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	s.StartLookupIP(dns.MustNewName("example.com"))
 	s.StartNTP(netip.AddrFrom4(fzPIP4))
 	// Client ports are not exported: learn them from egress source ports.
