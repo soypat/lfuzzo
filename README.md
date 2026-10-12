@@ -44,6 +44,11 @@ go work init
 go work use . ./lneto
 ```
 
+After lneto fix is merged to main update lfuzzo's Lneto version to latest with `go get -u` with direct github query:
+```sh
+GOPROXY=direct go get -u github.com/soypat/lneto
+```
+
 ## Fuzz corpus and seeding new machines
 Fuzz corpus is located at `$GOCACHE/fuzz`. Following command works in bash, zsh and PowerShell:
 ```sh
