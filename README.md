@@ -28,6 +28,24 @@ After a failure cases are found you may replay them by just running tests:
 go test ./...
 ```
 
+## I think I found a failure!
+If while fuzzing you run into a failure it'll look something like so:
+```
+--- FAIL: FuzzHTTPClientServer (1811.83s)
+    --- FAIL: FuzzHTTPClientServer (0.00s)
+        dual_test.go:187: did not expect failure: i/o timeout
+    
+    Failing input written to testdata/fuzz/FuzzHTTPClientServer/675f741665d4dd06
+```
+Our failure was written to `mutation/testdata/fuzz/FuzzHTTPClientServer/675f741665d4dd06` in this case since we were fuzzing the `mutation` package. The fuzz failure can be shared by cat'ing the file and posting the contents:
+```sh
+$ cat mutation/testdata/fuzz/FuzzHTTPClientServer/675f741665d4dd06
+go test fuzz v1
+uint64(10806)
+[]byte("B\x01\x0000\xf9\xff\xff00007000007\x00\x00\x01\x00")
+```
+
+
 ### Tracing a failure
 
 Build with the `lfuzzotrace` tag to log every segment exchanged, mutations applied, ingress errors and connection state between phases:
