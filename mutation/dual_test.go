@@ -131,12 +131,17 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 	must(err)
 	// Send request over the network.
 	mtuFail2, mutated2 := stacksQuiesceMutateTCP(t, &cl, &sv, maxRounds, buf, mtcp, &script)
+	mutated = mutated || mutated2
 	if mtuFail2 {
 		t.Fatal("unexpected mtu fail")
+	} else if svConn.State() != tcp.StateEstablished {
+		return
 	}
 	if len(req) != svConn.Conn().BufferedInput() {
-		if mutated2 {
-			// malfunction due to mutation.
+		if mutated {
+			if clConn.State() != tcp.StateEstablished {
+				return // Connection ended gracefully"
+			}
 		} else {
 			t.Fatal("did not receive request fully")
 		}
@@ -159,8 +164,6 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 		NumHeaderKVCap:   12,
 		PathValuesBuf:    make([]httphi.PathValue, mux.MaxPathValues()),
 	})
-	// Expired deadline: Read returns buffered data, then fails instead of
-	// spinning when mutation lost part of the request.
 	must(svConn.SetReadDeadline(time.Now()))
 	if !svExch.Acquire(svConn) {
 		t.Fatal("exchange could not acquire server connection")
@@ -177,20 +180,22 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 		t.Fatal("unexpected empty response")
 	}
 	mtuFail3, mutated3 := stacksQuiesceMutateTCP(t, &sv, &cl, maxRounds, buf, mtcp, &script)
+	mutated = mutated || mutated3
 	if mtuFail3 {
 		t.Fatal("mtu fail on server HTTP response")
 	}
+	clState := clConn.State()
 	n, err := clConn.InternalHandler().Read(buf)
 	if n == 0 {
-		if mutated3 {
+		if mutated || !clState.RxDataOpen() {
 			return
 		}
-		t.Fatal("failed to read server's response")
+		t.Fatal("failed to read server's response", clState)
 	}
 	// done!
 }
 
-// maxRounds bounds exchanges per phase. Normal traffic settles in a few rounds,
+// maxRounds bounds unmutated exchanges per phase. Normal traffic settles in a few rounds,
 // so exceeding it indicates an endless exchange such as an ACK storm.
 const maxRounds = 64
 
@@ -198,7 +203,9 @@ const maxRounds = 64
 func backoffNone(uint) time.Duration { return 0 }
 
 func stacksQuiesceMutateTCP(t *testing.T, s1, s2 *xnet.StackAsync, lim int, buf []byte, mutTCP *lfuzzo.MutatorTCPBasic, script *[]byte) (mtuExcess, mutation bool) {
-	for range lim {
+	// Rounds carrying a mutation do not count toward lim: each mutated segment
+	// draws a reply, so a long script sustains traffic without a stack fault.
+	for round := 0; round < lim; round++ {
 		exchanged := false
 		for _, s := range [2][2]*xnet.StackAsync{{s1, s2}, {s2, s1}} {
 			tx, rx := s[0], s[1]
@@ -217,6 +224,7 @@ func stacksQuiesceMutateTCP(t *testing.T, s1, s2 *xnet.StackAsync, lim int, buf 
 						*script = mutTCP.Load(*script)
 						if mutTCP.MutateTCP(tfrm) {
 							mutation = true
+							round = -1 // Reset round. This prevents mutation triggering a vicious response cycle.
 							var crc lneto.CRC791
 							ifrm.CRCWriteTCPPseudo(&crc)
 							tfrm.SetCRC(0)
@@ -231,6 +239,6 @@ func stacksQuiesceMutateTCP(t *testing.T, s1, s2 *xnet.StackAsync, lim int, buf 
 			return mtuExcess, mutation
 		}
 	}
-	t.Error("stacks did not quiesce after", lim)
+	t.Error("stacks did not quiesce after", lim, "rounds without mutation")
 	return mtuExcess, mutation
 }

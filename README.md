@@ -8,18 +8,20 @@ Packages are split by how fuzz inputs are generated. What counts as a failure is
 
 | Package     | Strategy |
 |-------------|----------|
-| `synth`     | Builds valid frames from fuzz bytes (checksums, ports and transaction IDs fixed up) and feeds them to a `xnet.StackAsync` with every service active. |
+| `mutate`    | Intercept packets between two `xnet.StackAsync` at random and mutates their contents. |
+| `synth`     | Build valid frames from fuzz bytes (checksums, ports and transaction IDs fixed up) and feeds them to a `xnet.StackAsync` with every service active. |
 | `roundtrip` | Codec fuzzing: decode, encode, decode again, and compare. |
 | `regress`   | Fixed tests for bugs found by fuzzing. No fuzzing. |
 | `check`     | Shared oracles (well-formed egress frames, lengths, checksums). Not a test package. |
 
 ## Fuzzing the stack
 
-`FuzzIngressMulti` reaches the most of lneto. It sends a stream of crafted IPv4, IPv6 and raw Ethernet packets into a stack with fuzzed MTU and ICMP queue size, while DHCP, DNS, NTP, ICMP, NDP and ARP are all active.
+`FuzzHTTPClientServer` reaches the most critical part of lneto. Today the `tcp` and `httphi` packages are used by a large number of people in the embedded space. This fuzz test fuzzes the entire Ethernet+IPv4+TCP+HTTP stack:
 
 ```sh
-go test -run XXX -fuzz 'FuzzIngressMulti$' -fuzztime 5m ./synth/
+go test -run XXX -fuzz 'FuzzHTTPClientServer$' -fuzzminimizetime 240s -fuzztime 5m ./mutation/
 ```
+A high value for flag `-fuzzminimizetime t` ensures a decent amount of time is allocated to minimizing the failing input.
 
 After a failure cases are found you may replay them by just running tests:
 ```sh
