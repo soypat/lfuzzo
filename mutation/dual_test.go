@@ -1,10 +1,12 @@
 package mutation
 
 import (
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/soypat/lfuzzo"
+	"github.com/soypat/lfuzzo/internal/trace"
 	"github.com/soypat/lneto"
 	"github.com/soypat/lneto/ethernet"
 	"github.com/soypat/lneto/http/httphi"
@@ -21,6 +23,10 @@ func FuzzHTTPClientServer(f *testing.F) {
 	f.Add(uint64(0), []byte{})                     // Clean run.
 	f.Add(uint64(0x0f0f), []byte{0, 0, 0x2, 1, 0}) // SEQ+1 on the third segment.
 	f.Add(uint64(0x2a00), []byte{0x10, 0, 0})      // WND nudge on the SYN.
+	// Fuzzeresco Team Findings:
+	{
+		f.Add(uint64(10759), []byte("$0000\xf9\xff\xff00007000007\x00\x00\x01\x00")) // Pato: "Listen to SYNFIN to desync"
+	}
 	f.Fuzz(func(t *testing.T, cfg uint64, script []byte) {
 		mutTcp := lfuzzo.MutatorTCPBasic{
 			RateACKNudge: 1,
@@ -116,6 +122,9 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 		t.Fatal("expected established server connection")
 	}
 
+	if trace.Enabled {
+		t.Log("handshake done: cl", clConn.State(), "sv", svConn.State(), "mutated", mutated)
+	}
 	// Connection established, Begin HTTP phase.
 
 	var hdr httpraw.HeaderV1
@@ -132,6 +141,10 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 	// Send request over the network.
 	mtuFail2, mutated2 := stacksQuiesceMutateTCP(t, &cl, &sv, maxRounds, buf, mtcp, &script)
 	mutated = mutated || mutated2
+	if trace.Enabled {
+		t.Log("request sent: cl", clConn.State(), "sv", svConn.State(), "mutated", mutated2,
+			"sv buffered", svConn.Conn().BufferedInput(), "of", len(req), "cl unsent", clConn.BufferedUnsent())
+	}
 	if mtuFail2 {
 		t.Fatal("unexpected mtu fail")
 	} else if svConn.State() != tcp.StateEstablished {
@@ -181,6 +194,10 @@ func testRandHTTPSetup(t *testing.T, mtcp *lfuzzo.MutatorTCPBasic, cfg uint64, s
 	}
 	mtuFail3, mutated3 := stacksQuiesceMutateTCP(t, &sv, &cl, maxRounds, buf, mtcp, &script)
 	mutated = mutated || mutated3
+	if trace.Enabled {
+		t.Log("response sent: cl", clConn.State(), "sv", svConn.State(), "mutated", mutated3,
+			"cl buffered", clConn.BufferedInput(), "sv unsent", svConn.Conn().BufferedUnsent())
+	}
 	if mtuFail3 {
 		t.Fatal("mtu fail on server HTTP response")
 	}
@@ -222,7 +239,14 @@ func stacksQuiesceMutateTCP(t *testing.T, s1, s2 *xnet.StackAsync, lim int, buf 
 					if ifrm.Protocol() == lneto.IPProtoTCP {
 						tfrm, _ := tcp.NewFrame(ifrm.Payload())
 						*script = mutTCP.Load(*script)
+						var pre tcp.Segment
+						if trace.Enabled {
+							pre = tfrm.Segment(len(tfrm.Payload()))
+						}
 						if mutTCP.MutateTCP(tfrm) {
+							if trace.Enabled {
+								t.Logf("MUT %s: %+v => %+v", netip.AddrFrom4(tx.Addr4()), pre, tfrm.Segment(len(tfrm.Payload())))
+							}
 							mutation = true
 							round = -1 // Reset round. This prevents mutation triggering a vicious response cycle.
 							var crc lneto.CRC791
@@ -230,9 +254,15 @@ func stacksQuiesceMutateTCP(t *testing.T, s1, s2 *xnet.StackAsync, lim int, buf 
 							tfrm.SetCRC(0)
 							tfrm.SetCRC(crc.PayloadSum16(ifrm.Payload()))
 						}
+						if trace.Enabled {
+							t.Logf("SEG %s->%s: %+v", netip.AddrFrom4(tx.Addr4()), netip.AddrFrom4(rx.Addr4()), tfrm.Segment(len(tfrm.Payload())))
+						}
 					}
 				}
-				rx.IngressEthernet(buf[:ntx])
+				err := rx.IngressEthernet(buf[:ntx])
+				if trace.Enabled && err != nil {
+					t.Logf("    ingress %s: %v", netip.AddrFrom4(rx.Addr4()), err)
+				}
 			}
 		}
 		if !exchanged {

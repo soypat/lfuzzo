@@ -28,6 +28,14 @@ After a failure cases are found you may replay them by just running tests:
 go test ./...
 ```
 
+### Tracing a failure
+
+Build with the `lfuzzotrace` tag to log every segment exchanged, mutations applied, ingress errors and connection state between phases:
+```sh
+go test -tags=lfuzzotrace -run 'FuzzHTTPClientServer/da1c32f8b4f9a428' -v ./mutation/
+```
+Tracing code is guarded by the `trace.Enabled` constant in [`internal/trace`](./internal/trace) and compiles away without the tag, so fuzzing speed is unaffected.
+
 ## Pulling a specific lneto version + Developing
 
 You may pull a specific in-development branch of lneto by specifying the branch name or commit name. To pull the `ssh3` branch:
