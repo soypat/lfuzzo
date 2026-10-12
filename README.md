@@ -19,7 +19,7 @@ Packages are split by how fuzz inputs are generated. What counts as a failure is
 `FuzzHTTPClientServer` reaches the most critical part of lneto. Today the `tcp` and `httphi` packages are used by a large number of people in the embedded space. This fuzz test fuzzes the entire Ethernet+IPv4+TCP+HTTP stack:
 
 ```sh
-go test -run XXX -fuzz 'FuzzHTTPClientServer$' -fuzzminimizetime 240s -fuzztime 5m ./mutation/
+go test -run XXX -fuzz 'FuzzHTTPClientServer$' -fuzzminimizetime 240s ./mutation/
 ```
 A high value for flag `-fuzzminimizetime t` ensures a decent amount of time is allocated to minimizing the failing input.
 
