@@ -11,6 +11,7 @@ Packages are split by how fuzz inputs are generated. What counts as a failure is
 | `mutate`    | Intercept packets between two `xnet.StackAsync` at random and mutates their contents. |
 | `synth`     | Build valid frames from fuzz bytes (checksums, ports and transaction IDs fixed up) and feeds them to a `xnet.StackAsync` with every service active. |
 | `roundtrip` | Codec fuzzing: decode, encode, decode again, and compare. |
+| `model`     | Drive two `xnet.StackAsync` through a fuzzed script of application actions (writes, reads, pings, closes) and check what the stacks must guarantee. |
 | `regress`   | Fixed tests for bugs found by fuzzing. No fuzzing. |
 | `check`     | Shared oracles (well-formed egress frames, lengths, checksums). Not a test package. |
 
