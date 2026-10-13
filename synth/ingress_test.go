@@ -68,7 +68,7 @@ func newFuzzStackCfg(t testing.TB, mtu uint16, icmpq int) (*xnet.StackAsync, []u
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.StartLookupIP(dns.MustNewName("example.com"))
+	s.LookupIPStart(dns.MustNewName("example.com"), dns.TypeA, 2)
 	s.StartNTP(netip.AddrFrom4(fzPIP4))
 	// Client ports are not exported: learn them from egress source ports.
 	fzDNSPort, fzNTPPort = 0, 0
@@ -233,7 +233,7 @@ func FuzzIngress(f *testing.F) {
 			s.EgressEthernet(buf)
 		}
 		host := dns.MustNewName("example.com")
-		s.ResultLookupIP(host) // Also walks the CNAME chain.
+		s.LookupIPStart(host, dns.TypeA, 2) // Also walks the CNAME chain.
 		if r, err := s.ResultDHCP(); err == nil {
 			s.AssimilateDHCPResults(r)
 		}
