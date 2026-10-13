@@ -8,7 +8,7 @@ Packages are split by how fuzz inputs are generated. What counts as a failure is
 
 | Package     | Strategy |
 |-------------|----------|
-| `mutate`    | Intercept packets between two `xnet.StackAsync` at random and mutates their contents. |
+| `mutation`  | Intercept packets between two `xnet.StackAsync` at random and mutates their contents. |
 | `synth`     | Build valid frames from fuzz bytes (checksums, ports and transaction IDs fixed up) and feeds them to a `xnet.StackAsync` with every service active. |
 | `roundtrip` | Codec fuzzing: decode, encode, decode again, and compare. |
 | `model`     | Drive two `xnet.StackAsync` through a fuzzed script of application actions (writes, reads, pings, closes) and check what the stacks must guarantee. |
@@ -85,4 +85,4 @@ ls "$(go env GOCACHE)/fuzz/github.com/soypat/lfuzzo"
 This is where "interesting" results are persisted. They can be used to seed a machine before it begins fuzzing for the first time.
 
 ## Contributing
-PRs welcome!
+PRs welcome! See [docs/TESTING.md](./docs/TESTING.md) for where a fuzzer belongs, what counts as a failure and what to do with a finding.
